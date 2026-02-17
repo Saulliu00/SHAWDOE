@@ -19,7 +19,11 @@ export class StatsRepository {
         TableName: this.tableName,
         Key: { pk: `DAILY#${dateKey}`, sk: platform },
         UpdateExpression:
-          'SET processed = if_not_exists(processed, :zero) + :count, updatedAt = :now',
+          'SET #p = if_not_exists(#p, :zero) + :count, #u = :now',
+        ExpressionAttributeNames: {
+          '#p': 'processed',
+          '#u': 'updatedAt',
+        },
         ExpressionAttributeValues: {
           ':count': count,
           ':zero': 0,
@@ -38,7 +42,11 @@ export class StatsRepository {
         TableName: this.tableName,
         Key: { pk: `DAILY#${dateKey}`, sk: platform },
         UpdateExpression:
-          'SET reframed = if_not_exists(reframed, :zero) + :count, updatedAt = :now',
+          'SET #r = if_not_exists(#r, :zero) + :count, #u = :now',
+        ExpressionAttributeNames: {
+          '#r': 'reframed',
+          '#u': 'updatedAt',
+        },
         ExpressionAttributeValues: {
           ':count': count,
           ':zero': 0,

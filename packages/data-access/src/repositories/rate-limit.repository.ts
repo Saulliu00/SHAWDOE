@@ -25,21 +25,22 @@ export class RateLimitRepository {
     const now = Math.floor(Date.now() / 1000);
     const windowStart = now - (now % WINDOW_SECONDS);
 
-    // Atomic increment-if-under-limit within the current window.
-    // If the window has expired, reset the counter to 1.
-    // If the counter is at or over the limit, the condition fails.
+    // Strategy: Use separate operations for same-window increment vs window reset.
+    // This avoids the race condition where increment+reset in one expression
+    // would add to a stale count and then try to fix it non-atomically.
+
+    // Attempt 1: Increment within the current window
     try {
       const result = await client.send(
         new UpdateCommand({
           TableName: this.tableName,
           Key: { clientId },
           UpdateExpression:
-            'SET requestCount = if_not_exists(requestCount, :zero) + :one, windowStart = :ws, #t = :ttl',
+            'SET requestCount = requestCount + :one, #t = :ttl',
           ConditionExpression:
-            'attribute_not_exists(windowStart) OR windowStart < :ws OR requestCount < :limit',
+            'attribute_exists(windowStart) AND windowStart = :ws AND requestCount < :limit',
           ExpressionAttributeNames: { '#t': 'ttl' },
           ExpressionAttributeValues: {
-            ':zero': 0,
             ':one': 1,
             ':ws': windowStart,
             ':limit': this.maxRequestsPerWindow,
@@ -50,36 +51,71 @@ export class RateLimitRepository {
       );
 
       const newCount = (result.Attributes?.requestCount as number) ?? 1;
-
-      // If the window just rolled over, the count includes stale data.
-      // DynamoDB incremented the old count. We need a second pass to reset.
-      const storedWindow = result.Attributes?.windowStart as number;
-      if (storedWindow < windowStart) {
-        // Window expired mid-flight — reset atomically
-        await client.send(
-          new UpdateCommand({
-            TableName: this.tableName,
-            Key: { clientId },
-            UpdateExpression: 'SET requestCount = :one, windowStart = :ws, #t = :ttl',
-            ConditionExpression: 'windowStart < :ws',
-            ExpressionAttributeNames: { '#t': 'ttl' },
-            ExpressionAttributeValues: {
-              ':one': 1,
-              ':ws': windowStart,
-              ':ttl': now + TTL_SECONDS,
-            },
-          }),
-        ).catch(() => {
-          // Another request already reset the window — that's fine
-        });
-
-        return {
-          allowed: true,
-          remaining: this.maxRequestsPerWindow - 1,
-          resetAt: windowStart + WINDOW_SECONDS,
-        };
+      return {
+        allowed: true,
+        remaining: Math.max(0, this.maxRequestsPerWindow - newCount),
+        resetAt: windowStart + WINDOW_SECONDS,
+      };
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) {
+        throw error;
       }
+      // Condition failed: either new item, window expired, or limit reached.
+    }
 
+    // Attempt 2: Reset the window (new item or expired window)
+    try {
+      await client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { clientId },
+          UpdateExpression:
+            'SET requestCount = :one, windowStart = :ws, #t = :ttl',
+          ConditionExpression:
+            'attribute_not_exists(windowStart) OR windowStart < :ws',
+          ExpressionAttributeNames: { '#t': 'ttl' },
+          ExpressionAttributeValues: {
+            ':one': 1,
+            ':ws': windowStart,
+            ':ttl': now + TTL_SECONDS,
+          },
+        }),
+      );
+
+      return {
+        allowed: true,
+        remaining: this.maxRequestsPerWindow - 1,
+        resetAt: windowStart + WINDOW_SECONDS,
+      };
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) {
+        throw error;
+      }
+      // Another request already reset the window — try increment one more time.
+    }
+
+    // Attempt 3: Retry increment after concurrent reset
+    try {
+      const result = await client.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { clientId },
+          UpdateExpression:
+            'SET requestCount = requestCount + :one, #t = :ttl',
+          ConditionExpression:
+            'windowStart = :ws AND requestCount < :limit',
+          ExpressionAttributeNames: { '#t': 'ttl' },
+          ExpressionAttributeValues: {
+            ':one': 1,
+            ':ws': windowStart,
+            ':limit': this.maxRequestsPerWindow,
+            ':ttl': now + TTL_SECONDS,
+          },
+          ReturnValues: 'ALL_NEW',
+        }),
+      );
+
+      const newCount = (result.Attributes?.requestCount as number) ?? 1;
       return {
         allowed: true,
         remaining: Math.max(0, this.maxRequestsPerWindow - newCount),

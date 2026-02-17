@@ -1,4 +1,4 @@
-import type { CommentInput, PipelineResult } from '@kindwords/types';
+import type { CommentInput, PipelineResult, PipelineOptions, WarmthLevel } from '@kindwords/types';
 import { Logger } from '@kindwords/utils';
 import type { ToxicityClassifier } from './stages/toxicity-classifier';
 import type { EmotionalReframer } from './stages/emotional-reframer';
@@ -15,8 +15,9 @@ export class KindWordsPipeline {
     this.logger = new Logger('KindWordsPipeline');
   }
 
-  async processComment(input: CommentInput): Promise<PipelineResult> {
+  async processComment(input: CommentInput, options?: PipelineOptions): Promise<PipelineResult> {
     this.logger.info('Processing single comment', { commentId: input.id });
+    const warmth: WarmthLevel = options?.warmth ?? 'medium';
 
     // Stage 1: Classify
     const classification = await this.classifier.execute(input.text);
@@ -34,14 +35,14 @@ export class KindWordsPipeline {
     const reframed = await this.reframer.execute({
       text: input.text,
       classification,
-    });
+    }, warmth);
 
     // Stage 3: Suggest
     const suggestedResponse = await this.suggester.execute({
       original: input.text,
       reframed,
       classification,
-    });
+    }, warmth);
 
     return {
       toxicity: classification,
@@ -51,8 +52,9 @@ export class KindWordsPipeline {
     };
   }
 
-  async processBatch(inputs: CommentInput[]): Promise<PipelineResult[]> {
+  async processBatch(inputs: CommentInput[], options?: PipelineOptions): Promise<PipelineResult[]> {
     this.logger.info('Processing batch', { count: inputs.length });
+    const warmth: WarmthLevel = options?.warmth ?? 'medium';
 
     // Stage 1: Classify all in batch
     const classifications = await this.classifier.executeBatch(
@@ -63,11 +65,11 @@ export class KindWordsPipeline {
     const toxicIndices: number[] = [];
 
     for (let i = 0; i < inputs.length; i++) {
-      if (classifications[i].isToxic) {
+      if (classifications[i]?.isToxic) {
         toxicIndices.push(i);
       } else {
         results[i] = {
-          toxicity: classifications[i],
+          toxicity: classifications[i] ?? { isToxic: false, level: 'none', confidence: 0, categories: ['none'] },
           reframed: null,
           suggestedResponse: null,
           stagesExecuted: ['classify'],
@@ -90,7 +92,7 @@ export class KindWordsPipeline {
       text: inputs[i].text,
       classification: classifications[i],
     }));
-    const reframed = await this.reframer.executeBatch(reframeInputs);
+    const reframed = await this.reframer.executeBatch(reframeInputs, warmth);
 
     // Stage 3: Suggest responses in batch
     const suggestInputs = toxicIndices.map((i, j) => ({
@@ -98,7 +100,7 @@ export class KindWordsPipeline {
       reframed: reframed[j],
       classification: classifications[i],
     }));
-    const suggestions = await this.suggester.executeBatch(suggestInputs);
+    const suggestions = await this.suggester.executeBatch(suggestInputs, warmth);
 
     // Merge results
     for (let j = 0; j < toxicIndices.length; j++) {

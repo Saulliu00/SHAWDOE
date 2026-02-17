@@ -44,7 +44,7 @@ export function renderOverlay(
 
   const levelSection = document.createElement('div');
   levelSection.className = 'kindwords-tooltip-section';
-  levelSection.innerHTML = `<strong>Toxicity:</strong> ${result.toxicity.level} (${Math.round(result.toxicity.confidence * 100)}%)`;
+  levelSection.innerHTML = `<strong>Toxicity:</strong> ${escapeHtml(result.toxicity.level)} (${Math.round(result.toxicity.confidence * 100)}%)`;
 
   tooltip.appendChild(originalSection);
   tooltip.appendChild(levelSection);

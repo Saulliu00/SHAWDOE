@@ -7,6 +7,7 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
     twitch: true,
   },
   sensitivityThreshold: 'mild',
+  warmth: 'medium',
   apiBaseUrl: 'https://api.kindwords.app/v1',
   batchSize: 25,
   batchFlushIntervalMs: 2000,

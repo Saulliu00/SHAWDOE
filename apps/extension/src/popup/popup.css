@@ -81,6 +81,12 @@ select {
   cursor: pointer;
 }
 
+.setting-hint {
+  font-size: 11px;
+  color: #636e72;
+  margin-top: 4px;
+}
+
 .stats-section {
   display: flex;
   gap: 12px;

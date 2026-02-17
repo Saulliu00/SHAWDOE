@@ -4,10 +4,10 @@ export const processCommentsSchema = z.object({
   comments: z
     .array(
       z.object({
-        id: z.string().min(1),
+        id: z.string().min(1).max(256),
         text: z.string().min(1).max(2000),
-        author: z.string().optional(),
-        timestamp: z.string().optional(),
+        author: z.string().max(256).optional(),
+        timestamp: z.string().max(64).optional(),
       }),
     )
     .min(1)
@@ -15,11 +15,12 @@ export const processCommentsSchema = z.object({
   platform: z.enum(['youtube', 'twitch']),
   context: z
     .object({
-      videoId: z.string().optional(),
-      channelName: z.string().optional(),
+      videoId: z.string().max(128).optional(),
+      channelName: z.string().max(256).optional(),
     })
     .optional(),
   clientId: z.string().uuid(),
+  warmth: z.enum(['low', 'medium', 'high']).optional(),
 });
 
 export type ValidatedProcessRequest = z.infer<typeof processCommentsSchema>;

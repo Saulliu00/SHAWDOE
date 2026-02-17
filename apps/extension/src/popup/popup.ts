@@ -1,10 +1,11 @@
-import type { ExtensionConfig, ToxicityLevel } from '@kindwords/types';
+import type { ExtensionConfig, ToxicityLevel, WarmthLevel } from '@kindwords/types';
 
 async function init(): Promise<void> {
   const mainToggle = document.getElementById('main-toggle') as HTMLInputElement;
   const youtubeToggle = document.getElementById('youtube-toggle') as HTMLInputElement;
   const twitchToggle = document.getElementById('twitch-toggle') as HTMLInputElement;
   const sensitivitySelect = document.getElementById('sensitivity-select') as HTMLSelectElement;
+  const warmthSelect = document.getElementById('warmth-select') as HTMLSelectElement;
   const todayCount = document.getElementById('today-count')!;
   const totalCount = document.getElementById('total-count')!;
   const statusDot = document.getElementById('status-indicator')!;
@@ -17,6 +18,7 @@ async function init(): Promise<void> {
     youtubeToggle.checked = config.platforms.youtube;
     twitchToggle.checked = config.platforms.twitch;
     sensitivitySelect.value = config.sensitivityThreshold;
+    warmthSelect.value = config.warmth ?? 'medium';
   }
 
   // Load stats
@@ -52,6 +54,13 @@ async function init(): Promise<void> {
     chrome.runtime.sendMessage({
       type: 'UPDATE_CONFIG',
       payload: { sensitivityThreshold: sensitivitySelect.value as ToxicityLevel },
+    });
+  });
+
+  warmthSelect.addEventListener('change', () => {
+    chrome.runtime.sendMessage({
+      type: 'UPDATE_CONFIG',
+      payload: { warmth: warmthSelect.value as WarmthLevel },
     });
   });
 

@@ -23,9 +23,13 @@ export class MessageRouter {
   ): Promise<void> {
     try {
       switch (message.type) {
-        case 'PROCESS_BATCH':
-          await this.handleProcessBatch(message.payload, sendResponse);
+        case 'PROCESS_BATCH': {
+          // Inject warmth from user config into the batch payload
+          const config = await getConfig();
+          const enrichedPayload = { ...message.payload, warmth: message.payload.warmth ?? config.warmth };
+          await this.handleProcessBatch(enrichedPayload, sendResponse);
           break;
+        }
 
         case 'GET_CONFIG': {
           const config = await getConfig();
@@ -103,6 +107,7 @@ export class MessageRouter {
         comments: uncachedComments,
         platform: payload.platform,
         context: payload.context,
+        warmth: payload.warmth,
       });
 
       for (let j = 0; j < response.results.length; j++) {

@@ -1,4 +1,4 @@
-import type { CommentResult, Platform } from './comment';
+import type { CommentResult, Platform, WarmthLevel } from './comment';
 import type { ExtensionConfig } from './config';
 
 export type ExtensionMessage =
@@ -16,6 +16,7 @@ export interface ProcessBatchPayload {
     contentHash: string;
   }>;
   platform: Platform;
+  warmth?: WarmthLevel;
   context?: {
     videoId?: string;
     channelName?: string;

@@ -1,4 +1,4 @@
-import type { CommentInput, CommentResult, Platform } from './comment';
+import type { CommentInput, CommentResult, Platform, WarmthLevel } from './comment';
 
 export interface ProcessCommentsRequest {
   comments: CommentInput[];
@@ -8,6 +8,7 @@ export interface ProcessCommentsRequest {
     channelName?: string;
   };
   clientId: string;
+  warmth?: WarmthLevel;
 }
 
 export interface ProcessCommentsResponse {

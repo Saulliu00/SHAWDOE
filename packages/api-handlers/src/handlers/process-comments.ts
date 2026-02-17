@@ -24,21 +24,21 @@ const rateLimitRepo = new RateLimitRepository(process.env.RATE_LIMIT_TABLE!);
 
 const classifierClient = new BedrockClient({
   region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_CLASSIFIER ?? 'amazon.nova-2-lite-v1:0',
+  modelId: process.env.BEDROCK_MODEL_CLASSIFIER ?? 'us.amazon.nova-2-lite-v1:0',
   maxTokens: 1024,
   temperature: 0.1,
 });
 
 const reframerClient = new BedrockClient({
   region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_REFRAMER ?? 'amazon.nova-2-lite-v1:0',
+  modelId: process.env.BEDROCK_MODEL_REFRAMER ?? 'us.amazon.nova-2-lite-v1:0',
   maxTokens: 2048,
   temperature: 0.7,
 });
 
 const suggesterClient = new BedrockClient({
   region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_SUGGESTER ?? 'amazon.nova-2-lite-v1:0',
+  modelId: process.env.BEDROCK_MODEL_SUGGESTER ?? 'us.amazon.nova-2-lite-v1:0',
   maxTokens: 1024,
   temperature: 0.7,
 });
@@ -55,7 +55,16 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
   try {
     // Parse and validate
-    const body = JSON.parse(event.body ?? '{}');
+    let body: unknown;
+    try {
+      body = JSON.parse(event.body ?? '{}');
+    } catch {
+      return jsonResponse(
+        400,
+        { error: { code: 'INVALID_REQUEST', message: 'Malformed JSON body' }, requestId },
+        origin,
+      );
+    }
     const validation = validateRequest(processCommentsSchema, body);
 
     if (!validation.success) {
@@ -66,7 +75,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       );
     }
 
-    const { comments, platform, clientId } = validation.data;
+    const { comments, platform, clientId, warmth } = validation.data;
 
     // Rate limit check
     const rateLimited = await checkRateLimit(clientId, rateLimitRepo, requestId, origin);
@@ -104,10 +113,13 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       }),
     );
 
+    // Sort uncachedIndices so batch results map predictably to input order
+    uncachedIndices.sort((a, b) => a - b);
+
     // Process uncached comments through pipeline
     if (uncachedIndices.length > 0) {
       const uncachedComments = uncachedIndices.map((i) => comments[i]);
-      const pipelineResults = await pipeline.processBatch(uncachedComments);
+      const pipelineResults = await pipeline.processBatch(uncachedComments, { warmth });
 
       // Store results and cache them
       await Promise.all(
@@ -138,12 +150,12 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       );
     }
 
-    // Update stats
+    // Update stats (non-fatal — don't fail the request if stats write fails)
     const reframedCount = results.filter((r) => r.toxicity.isToxic).length;
     await Promise.all([
       statsRepo.incrementProcessed(platform, comments.length),
       reframedCount > 0 ? statsRepo.incrementReframed(platform, reframedCount) : Promise.resolve(),
-    ]);
+    ]).catch((err) => logger.error('Stats update failed', { error: String(err) }));
 
     logger.info('Processing complete', {
       requestId,

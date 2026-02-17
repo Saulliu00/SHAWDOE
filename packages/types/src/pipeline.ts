@@ -1,6 +1,10 @@
-import type { ToxicityClassification } from './comment';
+import type { ToxicityClassification, WarmthLevel } from './comment';
 
 export type PipelineStageName = 'classify' | 'reframe' | 'suggest';
+
+export interface PipelineOptions {
+  warmth?: WarmthLevel;
+}
 
 export interface PipelineResult {
   toxicity: ToxicityClassification;

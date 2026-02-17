@@ -23,7 +23,7 @@ export class ApiStack extends cdk.Stack {
       restApiName: 'KindWords API',
       description: 'API for processing and reframing toxic comments',
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: ['https://www.youtube.com', 'https://www.twitch.tv'],
         allowMethods: ['GET', 'POST', 'OPTIONS'],
         allowHeaders: ['Content-Type', 'X-Client-Id'],
       },
@@ -34,16 +34,6 @@ export class ApiStack extends cdk.Stack {
       },
     });
 
-    const commonEnv = {
-      CACHE_TABLE: props.cacheTable.tableName,
-      STATS_TABLE: props.statsTable.tableName,
-      RATE_LIMIT_TABLE: props.rateLimitTable.tableName,
-      BEDROCK_MODEL_CLASSIFIER: 'amazon.nova-2-lite-v1:0',
-      BEDROCK_MODEL_REFRAMER: 'amazon.nova-2-lite-v1:0',
-      BEDROCK_MODEL_SUGGESTER: 'amazon.nova-2-lite-v1:0',
-      BEDROCK_REGION: 'us-east-1',
-    };
-
     const handlersPath = path.join(__dirname, '../../../../packages/api-handlers/src/handlers');
 
     // Process Comments Lambda
@@ -52,8 +42,16 @@ export class ApiStack extends cdk.Stack {
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_20_X,
       memorySize: 512,
-      timeout: cdk.Duration.seconds(30),
-      environment: commonEnv,
+      timeout: cdk.Duration.seconds(60),
+      environment: {
+        CACHE_TABLE: props.cacheTable.tableName,
+        STATS_TABLE: props.statsTable.tableName,
+        RATE_LIMIT_TABLE: props.rateLimitTable.tableName,
+        BEDROCK_MODEL_CLASSIFIER: 'us.amazon.nova-2-lite-v1:0',
+        BEDROCK_MODEL_REFRAMER: 'us.amazon.nova-2-lite-v1:0',
+        BEDROCK_MODEL_SUGGESTER: 'us.amazon.nova-2-lite-v1:0',
+        BEDROCK_REGION: 'us-east-1',
+      },
       bundling: {
         minify: true,
         sourceMap: true,
@@ -67,7 +65,10 @@ export class ApiStack extends cdk.Stack {
     processCommentsFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
-        resources: ['arn:aws:bedrock:*::foundation-model/amazon.nova*'],
+        resources: [
+          'arn:aws:bedrock:us-*::foundation-model/amazon.nova-2-lite-v1:0',
+          'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-2-lite-v1:0',
+        ],
       }),
     );
 
@@ -78,7 +79,9 @@ export class ApiStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       memorySize: 128,
       timeout: cdk.Duration.seconds(5),
-      environment: commonEnv,
+      environment: {
+        CACHE_TABLE: props.cacheTable.tableName,
+      },
     });
     props.cacheTable.grantReadData(statusFn);
 
@@ -89,7 +92,9 @@ export class ApiStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_20_X,
       memorySize: 128,
       timeout: cdk.Duration.seconds(5),
-      environment: commonEnv,
+      environment: {
+        STATS_TABLE: props.statsTable.tableName,
+      },
     });
     props.statsTable.grantReadData(statsFn);
 

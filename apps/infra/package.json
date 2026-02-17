@@ -11,13 +11,14 @@
     "clean": "rm -rf dist cdk.out"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.130.0",
-    "constructs": "^10.3.0",
     "@kindwords/api-handlers": "*",
-    "@kindwords/types": "*"
+    "@kindwords/types": "*",
+    "aws-cdk-lib": "^2.130.0",
+    "constructs": "^10.3.0"
   },
   "devDependencies": {
     "aws-cdk": "^2.130.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }

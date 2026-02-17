@@ -1,4 +1,4 @@
-import type { ToxicityLevel } from './comment';
+import type { ToxicityLevel, WarmthLevel } from './comment';
 
 export interface ExtensionConfig {
   enabled: boolean;
@@ -7,6 +7,7 @@ export interface ExtensionConfig {
     twitch: boolean;
   };
   sensitivityThreshold: ToxicityLevel;
+  warmth: WarmthLevel;
   apiBaseUrl: string;
   batchSize: number;
   batchFlushIntervalMs: number;

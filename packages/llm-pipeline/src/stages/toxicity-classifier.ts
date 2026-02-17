@@ -48,7 +48,11 @@ export class ToxicityClassifier implements PipelineStageHandler<string, Toxicity
 
   private parseBatchResponse(raw: string, expectedCount: number): ToxicityClassification[] {
     try {
-      const jsonMatch = raw.match(/\[[\s\S]*\]/);
+      // Extract JSON from markdown code blocks if present (e.g. ```json ... ```)
+      const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonStr = codeBlockMatch ? codeBlockMatch[1].trim() : raw;
+
+      const jsonMatch = jsonStr.match(/\[[\s\S]*\]/);
       if (!jsonMatch) throw new Error('No JSON array found in response');
 
       const parsed = JSON.parse(jsonMatch[0]) as ToxicityClassification[];
@@ -59,20 +63,27 @@ export class ToxicityClassifier implements PipelineStageHandler<string, Toxicity
         });
       }
 
-      return parsed.map((item) => ({
+      const mapped = parsed.map((item) => ({
         isToxic: Boolean(item.isToxic),
-        level: item.level ?? 'none',
+        level: item.level ?? 'none' as const,
         confidence: Number(item.confidence) || 0,
-        categories: Array.isArray(item.categories) ? item.categories : ['none'],
+        categories: Array.isArray(item.categories) ? item.categories : ['none' as const],
       }));
+
+      // Pad with safe defaults if LLM returned fewer results than expected
+      while (mapped.length < expectedCount) {
+        mapped.push({ isToxic: false, level: 'none', confidence: 0, categories: ['none'] });
+      }
+
+      return mapped.slice(0, expectedCount);
     } catch (error) {
       this.logger.error('Failed to parse batch classification', { raw, error: String(error) });
-      return Array(expectedCount).fill({
+      return Array.from({ length: expectedCount }, () => ({
         isToxic: false,
-        level: 'none',
+        level: 'none' as const,
         confidence: 0,
-        categories: ['none'],
-      });
+        categories: ['none' as const],
+      }));
     }
   }
 }

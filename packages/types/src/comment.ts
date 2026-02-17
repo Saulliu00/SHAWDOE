@@ -2,6 +2,8 @@ export type Platform = 'youtube' | 'twitch';
 
 export type ToxicityLevel = 'none' | 'mild' | 'moderate' | 'severe';
 
+export type WarmthLevel = 'low' | 'medium' | 'high';
+
 export type ToxicityCategory =
   | 'harassment'
   | 'hate_speech'

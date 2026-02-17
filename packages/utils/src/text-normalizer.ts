@@ -3,7 +3,7 @@ export function normalizeText(text: string): string {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, ' ')
-    .replace(/[^\w\s.,!?'"-]/g, '');
+    .replace(/[^\p{L}\p{N}\s.,!?'"-]/gu, '');
 }
 
 export function truncateText(text: string, maxLength: number = 500): string {

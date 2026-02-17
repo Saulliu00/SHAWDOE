@@ -21,6 +21,7 @@ export class ApiClient {
         comments: payload.comments,
         platform: payload.platform,
         context: payload.context,
+        warmth: payload.warmth,
         clientId,
       }),
     });

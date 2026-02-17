@@ -1,0 +1,115 @@
+import * as cdk from 'aws-cdk-lib';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import type { Construct } from 'constructs';
+import * as path from 'path';
+
+export interface ApiStackProps extends cdk.StackProps {
+  cacheTable: dynamodb.Table;
+  statsTable: dynamodb.Table;
+  rateLimitTable: dynamodb.Table;
+}
+
+export class ApiStack extends cdk.Stack {
+  public readonly api: apigateway.RestApi;
+
+  constructor(scope: Construct, id: string, props: ApiStackProps) {
+    super(scope, id, props);
+
+    this.api = new apigateway.RestApi(this, 'KindWordsApi', {
+      restApiName: 'KindWords API',
+      description: 'API for processing and reframing toxic comments',
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: ['GET', 'POST', 'OPTIONS'],
+        allowHeaders: ['Content-Type', 'X-Client-Id'],
+      },
+      deployOptions: {
+        stageName: 'v1',
+        throttlingRateLimit: 100,
+        throttlingBurstLimit: 200,
+      },
+    });
+
+    const commonEnv = {
+      CACHE_TABLE: props.cacheTable.tableName,
+      STATS_TABLE: props.statsTable.tableName,
+      RATE_LIMIT_TABLE: props.rateLimitTable.tableName,
+      BEDROCK_MODEL_CLASSIFIER: 'amazon.nova-2-lite-v1:0',
+      BEDROCK_MODEL_REFRAMER: 'amazon.nova-2-lite-v1:0',
+      BEDROCK_MODEL_SUGGESTER: 'amazon.nova-2-lite-v1:0',
+      BEDROCK_REGION: 'us-east-1',
+    };
+
+    const handlersPath = path.join(__dirname, '../../../../packages/api-handlers/src/handlers');
+
+    // Process Comments Lambda
+    const processCommentsFn = new lambdaNodejs.NodejsFunction(this, 'ProcessCommentsFn', {
+      entry: path.join(handlersPath, 'process-comments.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 512,
+      timeout: cdk.Duration.seconds(30),
+      environment: commonEnv,
+      bundling: {
+        minify: true,
+        sourceMap: true,
+        externalModules: ['@aws-sdk/*'],
+      },
+    });
+
+    props.cacheTable.grantReadWriteData(processCommentsFn);
+    props.statsTable.grantReadWriteData(processCommentsFn);
+    props.rateLimitTable.grantReadWriteData(processCommentsFn);
+    processCommentsFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: ['arn:aws:bedrock:*::foundation-model/amazon.nova*'],
+      }),
+    );
+
+    // Status Lambda
+    const statusFn = new lambdaNodejs.NodejsFunction(this, 'StatusFn', {
+      entry: path.join(handlersPath, 'get-status.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 128,
+      timeout: cdk.Duration.seconds(5),
+      environment: commonEnv,
+    });
+    props.cacheTable.grantReadData(statusFn);
+
+    // Stats Lambda
+    const statsFn = new lambdaNodejs.NodejsFunction(this, 'StatsFn', {
+      entry: path.join(handlersPath, 'get-stats.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 128,
+      timeout: cdk.Duration.seconds(5),
+      environment: commonEnv,
+    });
+    props.statsTable.grantReadData(statsFn);
+
+    // API routes
+    const comments = this.api.root.addResource('comments');
+    const process = comments.addResource('process');
+    process.addMethod('POST', new apigateway.LambdaIntegration(processCommentsFn));
+
+    this.api.root
+      .addResource('status')
+      .addMethod('GET', new apigateway.LambdaIntegration(statusFn));
+
+    this.api.root
+      .addResource('stats')
+      .addMethod('GET', new apigateway.LambdaIntegration(statsFn));
+
+    // Output the API URL
+    new cdk.CfnOutput(this, 'ApiUrl', {
+      value: this.api.url,
+      description: 'KindWords API endpoint',
+    });
+  }
+}

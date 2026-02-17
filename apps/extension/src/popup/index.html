@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KindWords</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <h1>KindWords</h1>
+      <div id="status-indicator" class="status-dot"></div>
+    </header>
+
+    <section class="popup-section">
+      <div class="toggle-row">
+        <label for="main-toggle">Enable KindWords</label>
+        <input type="checkbox" id="main-toggle" checked>
+      </div>
+    </section>
+
+    <section class="popup-section">
+      <h2>Platforms</h2>
+      <div class="toggle-row">
+        <label for="youtube-toggle">YouTube</label>
+        <input type="checkbox" id="youtube-toggle" checked>
+      </div>
+      <div class="toggle-row">
+        <label for="twitch-toggle">Twitch</label>
+        <input type="checkbox" id="twitch-toggle" checked>
+      </div>
+    </section>
+
+    <section class="popup-section">
+      <h2>Sensitivity</h2>
+      <select id="sensitivity-select">
+        <option value="mild">All toxic (mild+)</option>
+        <option value="moderate">Moderate+</option>
+        <option value="severe">Severe only</option>
+      </select>
+    </section>
+
+    <section class="popup-section stats-section">
+      <div class="stat">
+        <span class="stat-value" id="today-count">0</span>
+        <span class="stat-label">Reframed today</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="total-count">0</span>
+        <span class="stat-label">Total reframed</span>
+      </div>
+    </section>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

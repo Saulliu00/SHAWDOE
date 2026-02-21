@@ -1,4 +1,4 @@
-import type { ToxicityLevel, WarmthLevel } from './comment';
+import type { WarmthLevel } from './comment';
 
 export interface ExtensionConfig {
   enabled: boolean;
@@ -6,7 +6,6 @@ export interface ExtensionConfig {
     youtube: boolean;
     twitch: boolean;
   };
-  sensitivityThreshold: ToxicityLevel;
   warmth: WarmthLevel;
   apiBaseUrl: string;
   batchSize: number;
@@ -19,9 +18,7 @@ export interface BackendConfig {
   rateLimitTableName: string;
   bedrock: {
     region: string;
-    classifierModelId: string;
-    reframerModelId: string;
-    suggesterModelId: string;
+    rewriterModelId: string;
     maxTokens: number;
     temperature: number;
   };

@@ -42,11 +42,10 @@ export interface StatusResponse {
 
 export interface StatsResponse {
   totalCommentsProcessed: number;
-  totalCommentsReframed: number;
+  totalCommentsRewritten: number;
   cacheHitRate: number;
-  averageToxicityRate: number;
   platformBreakdown: {
-    youtube: { processed: number; reframed: number };
-    twitch: { processed: number; reframed: number };
+    youtube: { processed: number; rewritten: number };
+    twitch: { processed: number; rewritten: number };
   };
 }

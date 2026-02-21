@@ -30,24 +30,18 @@ export function renderOverlay(
   const badge = document.createElement('span');
   badge.className = BADGE_CLASS;
   badge.textContent = 'KW';
-  badge.title = 'This comment was reframed by KindWords';
+  badge.title = 'Rewritten by KindWords — click to see original';
 
   // Create tooltip container
   const tooltip = document.createElement('div');
   tooltip.className = TOOLTIP_CLASS;
   tooltip.style.display = 'none';
 
-  // Tooltip content
+  // Tooltip content — show original text
   const originalSection = document.createElement('div');
   originalSection.className = 'kindwords-tooltip-section';
   originalSection.innerHTML = `<strong>Original:</strong> <span class="kindwords-original-text">${escapeHtml(originalText)}</span>`;
-
-  const levelSection = document.createElement('div');
-  levelSection.className = 'kindwords-tooltip-section';
-  levelSection.innerHTML = `<strong>Toxicity:</strong> ${escapeHtml(result.toxicity.level)} (${Math.round(result.toxicity.confidence * 100)}%)`;
-
   tooltip.appendChild(originalSection);
-  tooltip.appendChild(levelSection);
 
   if (result.suggestedResponse) {
     const suggestSection = document.createElement('div');

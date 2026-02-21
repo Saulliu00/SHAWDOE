@@ -1,14 +1,13 @@
 import { GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
-import type { ToxicityClassification, Platform } from '@kindwords/types';
+import type { Platform } from '@kindwords/types';
 import { Logger } from '@kindwords/utils';
 import { getDocClient } from '../client';
 
 export interface CacheEntry {
   contentHash: string;
   originalText: string;
-  toxicity: ToxicityClassification;
-  reframed: string | null;
-  suggestedResponse: string | null;
+  reframed: string;
+  suggestedResponse: string;
   platform: Platform;
   createdAt: string;
   ttl: number;

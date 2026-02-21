@@ -7,19 +7,17 @@ export function replaceComment(
   extracted: ExtractedComment,
   result: CommentResult,
 ): void {
-  if (!result.toxicity.isToxic || !result.reframed) return;
-
   const { domNode } = extracted;
   if (domNode.classList.contains(REFRAMED_CLASS)) return;
 
   // Store original text
   const originalText = domNode.textContent ?? '';
 
-  // Replace text
+  // Replace text with rewritten version
   domNode.textContent = result.reframed;
   domNode.classList.add(REFRAMED_CLASS);
 
-  // Add overlay badge
+  // Add overlay badge (shows original on hover)
   renderOverlay(domNode, originalText, result);
 }
 
@@ -30,7 +28,7 @@ export function replaceBatch(
   let replacedCount = 0;
 
   for (let i = 0; i < comments.length; i++) {
-    if (results[i]?.toxicity.isToxic && results[i]?.reframed) {
+    if (results[i]?.reframed) {
       replaceComment(comments[i], results[i]);
       replacedCount++;
     }

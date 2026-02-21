@@ -47,9 +47,7 @@ export class ApiStack extends cdk.Stack {
         CACHE_TABLE: props.cacheTable.tableName,
         STATS_TABLE: props.statsTable.tableName,
         RATE_LIMIT_TABLE: props.rateLimitTable.tableName,
-        BEDROCK_MODEL_CLASSIFIER: 'us.amazon.nova-2-lite-v1:0',
-        BEDROCK_MODEL_REFRAMER: 'us.amazon.nova-2-lite-v1:0',
-        BEDROCK_MODEL_SUGGESTER: 'us.amazon.nova-2-lite-v1:0',
+        BEDROCK_MODEL_REWRITER: 'us.amazon.nova-2-lite-v1:0',
         BEDROCK_REGION: 'us-east-1',
       },
       bundling: {

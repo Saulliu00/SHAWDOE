@@ -6,7 +6,6 @@ export const DEFAULT_CONFIG: ExtensionConfig = {
     youtube: true,
     twitch: true,
   },
-  sensitivityThreshold: 'mild',
   warmth: 'medium',
   apiBaseUrl: 'https://api.kindwords.app/v1',
   batchSize: 25,

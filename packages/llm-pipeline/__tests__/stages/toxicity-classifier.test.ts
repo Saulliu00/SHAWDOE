@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ToxicityClassifier } from '../../src/stages/toxicity-classifier';
+import { Rewriter } from '../../src/stages/rewriter';
 import type { BedrockClient } from '../../src/bedrock-client';
 
 function mockBedrockClient(response: string): BedrockClient {
@@ -8,58 +8,62 @@ function mockBedrockClient(response: string): BedrockClient {
   } as unknown as BedrockClient;
 }
 
-describe('ToxicityClassifier', () => {
-  it('classifies toxic comment correctly', async () => {
+describe('Rewriter', () => {
+  it('rewrites a single comment with reframed text and suggestion', async () => {
     const bedrockResponse = JSON.stringify({
-      isToxic: true,
-      level: 'severe',
-      confidence: 0.95,
-      categories: ['insult', 'harassment'],
+      reframed: 'I respectfully disagree with the content here.',
+      suggestedResponse: 'Thanks for sharing your perspective!',
     });
 
-    const classifier = new ToxicityClassifier(mockBedrockClient(bedrockResponse));
-    const result = await classifier.execute('you are terrible');
+    const rewriter = new Rewriter(mockBedrockClient(bedrockResponse));
+    const result = await rewriter.execute('this video is garbage');
 
-    expect(result.isToxic).toBe(true);
-    expect(result.level).toBe('severe');
-    expect(result.confidence).toBe(0.95);
-    expect(result.categories).toContain('insult');
+    expect(result.reframed).toBe('I respectfully disagree with the content here.');
+    expect(result.suggestedResponse).toBe('Thanks for sharing your perspective!');
   });
 
-  it('classifies benign comment as non-toxic', async () => {
-    const bedrockResponse = JSON.stringify({
-      isToxic: false,
-      level: 'none',
-      confidence: 0.98,
-      categories: ['none'],
-    });
+  it('handles malformed single response gracefully', async () => {
+    const rewriter = new Rewriter(mockBedrockClient('invalid json response'));
+    const result = await rewriter.execute('test comment');
 
-    const classifier = new ToxicityClassifier(mockBedrockClient(bedrockResponse));
-    const result = await classifier.execute('great video, thanks for sharing!');
-
-    expect(result.isToxic).toBe(false);
-    expect(result.level).toBe('none');
+    expect(result.reframed).toBe('test comment');
+    expect(result.suggestedResponse).toBe('');
   });
 
-  it('handles malformed response gracefully', async () => {
-    const classifier = new ToxicityClassifier(mockBedrockClient('invalid json response'));
-    const result = await classifier.execute('test');
-
-    expect(result.isToxic).toBe(false);
-    expect(result.level).toBe('none');
-  });
-
-  it('processes batch classification', async () => {
+  it('processes batch rewrite', async () => {
     const batchResponse = JSON.stringify([
-      { isToxic: true, level: 'moderate', confidence: 0.8, categories: ['insult'] },
-      { isToxic: false, level: 'none', confidence: 0.95, categories: ['none'] },
+      { reframed: 'Kind version 1', suggestedResponse: 'Reply 1' },
+      { reframed: 'Kind version 2', suggestedResponse: 'Reply 2' },
     ]);
 
-    const classifier = new ToxicityClassifier(mockBedrockClient(batchResponse));
-    const results = await classifier.executeBatch(['toxic comment', 'nice comment']);
+    const rewriter = new Rewriter(mockBedrockClient(batchResponse));
+    const results = await rewriter.executeBatch(['toxic 1', 'toxic 2']);
 
     expect(results).toHaveLength(2);
-    expect(results[0].isToxic).toBe(true);
-    expect(results[1].isToxic).toBe(false);
+    expect(results[0].reframed).toBe('Kind version 1');
+    expect(results[1].suggestedResponse).toBe('Reply 2');
+  });
+
+  it('pads batch response when LLM returns fewer results', async () => {
+    const batchResponse = JSON.stringify([
+      { reframed: 'Kind version 1', suggestedResponse: 'Reply 1' },
+    ]);
+
+    const rewriter = new Rewriter(mockBedrockClient(batchResponse));
+    const results = await rewriter.executeBatch(['comment 1', 'comment 2']);
+
+    expect(results).toHaveLength(2);
+    expect(results[0].reframed).toBe('Kind version 1');
+    expect(results[1].reframed).toBe('comment 2'); // Falls back to original text
+  });
+
+  it('handles code block wrapped JSON response', async () => {
+    const bedrockResponse = '```json\n{"reframed": "Nice version", "suggestedResponse": "Thanks!"}\n```';
+
+    const rewriter = new Rewriter(mockBedrockClient(bedrockResponse));
+    const result = await rewriter.execute('mean comment');
+
+    expect(result.reframed).toBe('Nice version');
+    expect(result.suggestedResponse).toBe('Thanks!');
   });
 });

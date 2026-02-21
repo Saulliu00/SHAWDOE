@@ -120,10 +120,10 @@ export class MessageRouter {
       }
     }
 
-    // Update local stats
-    const reframedCount = results.filter((r) => r.toxicity.isToxic).length;
-    if (reframedCount > 0) {
-      await incrementLocalStats(reframedCount);
+    // Update local stats — all comments are rewritten
+    const rewrittenCount = results.filter((r) => r.reframed).length;
+    if (rewrittenCount > 0) {
+      await incrementLocalStats(rewrittenCount);
     }
 
     sendResponse({ type: 'PROCESS_BATCH_RESULT', payload: results });

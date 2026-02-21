@@ -1,10 +1,9 @@
-import type { ExtensionConfig, ToxicityLevel, WarmthLevel } from '@kindwords/types';
+import type { ExtensionConfig, WarmthLevel } from '@kindwords/types';
 
 async function init(): Promise<void> {
   const mainToggle = document.getElementById('main-toggle') as HTMLInputElement;
   const youtubeToggle = document.getElementById('youtube-toggle') as HTMLInputElement;
   const twitchToggle = document.getElementById('twitch-toggle') as HTMLInputElement;
-  const sensitivitySelect = document.getElementById('sensitivity-select') as HTMLSelectElement;
   const warmthSelect = document.getElementById('warmth-select') as HTMLSelectElement;
   const todayCount = document.getElementById('today-count')!;
   const totalCount = document.getElementById('total-count')!;
@@ -17,7 +16,6 @@ async function init(): Promise<void> {
     mainToggle.checked = config.enabled;
     youtubeToggle.checked = config.platforms.youtube;
     twitchToggle.checked = config.platforms.twitch;
-    sensitivitySelect.value = config.sensitivityThreshold;
     warmthSelect.value = config.warmth ?? 'medium';
   }
 
@@ -47,13 +45,6 @@ async function init(): Promise<void> {
     chrome.runtime.sendMessage({
       type: 'UPDATE_CONFIG',
       payload: { platforms: { youtube: youtubeToggle.checked, twitch: twitchToggle.checked } },
-    });
-  });
-
-  sensitivitySelect.addEventListener('change', () => {
-    chrome.runtime.sendMessage({
-      type: 'UPDATE_CONFIG',
-      payload: { sensitivityThreshold: sensitivitySelect.value as ToxicityLevel },
     });
   });
 

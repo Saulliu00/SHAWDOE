@@ -2,13 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { randomUUID } from 'crypto';
 import type { CommentResult } from '@kindwords/types';
 import { Logger, hashContent, normalizeText } from '@kindwords/utils';
-import {
-  KindWordsPipeline,
-  BedrockClient,
-  ToxicityClassifier,
-  EmotionalReframer,
-  ResponseSuggester,
-} from '@kindwords/llm-pipeline';
+import { KindWordsPipeline, BedrockClient, Rewriter } from '@kindwords/llm-pipeline';
 import { CacheRepository, StatsRepository, RateLimitRepository } from '@kindwords/data-access';
 import { jsonResponse } from '../middleware/cors';
 import { processCommentsSchema, validateRequest } from '../middleware/validator';
@@ -22,32 +16,14 @@ const cacheRepo = new CacheRepository(process.env.CACHE_TABLE!);
 const statsRepo = new StatsRepository(process.env.STATS_TABLE!);
 const rateLimitRepo = new RateLimitRepository(process.env.RATE_LIMIT_TABLE!);
 
-const classifierClient = new BedrockClient({
+const rewriterClient = new BedrockClient({
   region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_CLASSIFIER ?? 'us.amazon.nova-2-lite-v1:0',
-  maxTokens: 1024,
-  temperature: 0.1,
-});
-
-const reframerClient = new BedrockClient({
-  region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_REFRAMER ?? 'us.amazon.nova-2-lite-v1:0',
+  modelId: process.env.BEDROCK_MODEL_REWRITER ?? 'us.amazon.nova-2-lite-v1:0',
   maxTokens: 2048,
   temperature: 0.7,
 });
 
-const suggesterClient = new BedrockClient({
-  region: process.env.BEDROCK_REGION ?? 'us-east-1',
-  modelId: process.env.BEDROCK_MODEL_SUGGESTER ?? 'us.amazon.nova-2-lite-v1:0',
-  maxTokens: 1024,
-  temperature: 0.7,
-});
-
-const pipeline = new KindWordsPipeline(
-  new ToxicityClassifier(classifierClient),
-  new EmotionalReframer(reframerClient),
-  new ResponseSuggester(suggesterClient),
-);
+const pipeline = new KindWordsPipeline(new Rewriter(rewriterClient));
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const requestId = event.requestContext.requestId ?? randomUUID();
@@ -101,7 +77,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
           results[index] = {
             id: comment.id,
             original: comment.text,
-            toxicity: cached.toxicity,
             reframed: cached.reframed,
             suggestedResponse: cached.suggestedResponse,
             fromCache: true,
@@ -131,7 +106,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
           results[originalIndex] = {
             id: comment.id,
             original: comment.text,
-            toxicity: result.toxicity,
             reframed: result.reframed,
             suggestedResponse: result.suggestedResponse,
             fromCache: false,
@@ -141,7 +115,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
           await cacheRepo.put({
             contentHash: hash,
             originalText: comment.text,
-            toxicity: result.toxicity,
             reframed: result.reframed,
             suggestedResponse: result.suggestedResponse,
             platform,
@@ -150,11 +123,10 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       );
     }
 
-    // Update stats (non-fatal — don't fail the request if stats write fails)
-    const reframedCount = results.filter((r) => r.toxicity.isToxic).length;
+    // Update stats (non-fatal)
     await Promise.all([
       statsRepo.incrementProcessed(platform, comments.length),
-      reframedCount > 0 ? statsRepo.incrementReframed(platform, reframedCount) : Promise.resolve(),
+      statsRepo.incrementReframed(platform, uncachedIndices.length),
     ]).catch((err) => logger.error('Stats update failed', { error: String(err) }));
 
     logger.info('Processing complete', {
@@ -162,7 +134,6 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
       total: comments.length,
       cached: cachedCount,
       processed: uncachedIndices.length,
-      reframed: reframedCount,
     });
 
     return jsonResponse(

@@ -13,11 +13,18 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     const response: StatsResponse = {
       totalCommentsProcessed: stats.totalProcessed,
-      totalCommentsReframed: stats.totalReframed,
+      totalCommentsRewritten: stats.totalReframed,
       cacheHitRate: 0, // Would need additional tracking
-      averageToxicityRate:
-        stats.totalProcessed > 0 ? stats.totalReframed / stats.totalProcessed : 0,
-      platformBreakdown: stats.platformBreakdown,
+      platformBreakdown: {
+        youtube: {
+          processed: stats.platformBreakdown.youtube.processed,
+          rewritten: stats.platformBreakdown.youtube.reframed,
+        },
+        twitch: {
+          processed: stats.platformBreakdown.twitch.processed,
+          rewritten: stats.platformBreakdown.twitch.reframed,
+        },
+      },
     };
 
     return jsonResponse(200, response, origin);
